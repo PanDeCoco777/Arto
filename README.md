@@ -1,30 +1,33 @@
-# React + TypeScript + Vite
+# ArtiSell - Cebu Artisan Marketplace
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Database Setup Instructions
 
-Currently, two official plugins are available:
+1. Open your web browser and navigate to http://localhost/phpmyadmin/
+2. Log in with your MySQL credentials (default: username 'root' with no password)
+3. Create a new database named 'artisell' or import the provided SQL file:
+   - Click on 'Import' in the top menu
+   - Click 'Choose File' and select the 'artisell.sql' file from this project
+   - Click 'Go' at the bottom of the page
+4. The database and all required tables will be created automatically
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Application Setup
 
-## Expanding the ESLint configuration
+1. Place all project files in your web server's document root (e.g., htdocs for XAMPP)
+2. Navigate to http://localhost/artisell/ in your web browser
+3. If this is your first time running the application, visit http://localhost/artisell/setup.php to initialize the database
+4. You can now use the application
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## Default Login Credentials
 
-- Configure the top-level `parserOptions` property like this:
+- Admin User: admin@artisell.com / password
+- Regular User: user@artisell.com / password
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+## Features
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+- User authentication (login, signup, password reset)
+- Social media authentication
+- Product browsing with category and location filters
+- Shopping cart and checkout system
+- Order tracking
+- User profile management
+- Favorite products and artisans

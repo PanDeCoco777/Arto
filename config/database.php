@@ -1,5 +1,5 @@
 <?php
-// Database configuration
+// Database configuration for phpMyAdmin
 $host = 'localhost';
 $db_name = 'artisell';
 $username = 'root';
