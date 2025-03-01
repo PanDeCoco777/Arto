@@ -1,64 +1,98 @@
 <?php
-session_start();
 require_once '../config/database.php';
+session_start();
 
-// Get the provider from the URL
+// This is a simplified mock implementation of social login
+// In a real application, you would use OAuth libraries for each provider
+
 $provider = isset($_GET['provider']) ? $_GET['provider'] : '';
+$error = '';
 
-// This is a simplified version - in a real application, you would use OAuth libraries
-// For demonstration purposes, we'll simulate the social login process
-
-if ($provider) {
-    // In a real application, you would redirect to the provider's OAuth endpoint
-    // For demonstration, we'll simulate a successful authentication
-    
-    // Generate a fake user profile based on the provider
-    $social_id = 'social_' . $provider . '_' . rand(10000, 99999);
-    $name = 'Demo User';
-    $email = 'demo.' . $provider . '.' . rand(100, 999) . '@example.com';
+if (empty($provider)) {
+    $error = 'No provider specified';
+} else {
+    // Mock social login data
+    $socialId = 'social_' . uniqid();
+    $name = 'Social User';
+    $email = 'social_' . uniqid() . '@example.com';
     
     try {
-        // Check if user with this social ID exists
+        // Check if user exists with this social ID
         $stmt = $pdo->prepare("SELECT * FROM users WHERE social_id = ? AND social_provider = ?");
-        $stmt->execute([$social_id, $provider]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->execute([$socialId, $provider]);
+        $user = $stmt->fetch();
         
-        if ($user) {
-            // User exists, log them in
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_name'] = $user['name'];
-            $_SESSION['user_email'] = $user['email'];
+        if (!$user) {
+            // Check if email exists
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
             
-            // Update last login time
-            $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-            $stmt->execute([$user['id']]);
-        } else {
-            // User doesn't exist, create a new account
-            $stmt = $pdo->prepare("INSERT INTO users (name, email, social_id, social_provider, created_at) VALUES (?, ?, ?, ?, NOW())");
-            $stmt->execute([$name, $email, $social_id, $provider]);
-            $user_id = $pdo->lastInsertId();
-            
-            // Create user profile
-            $stmt = $pdo->prepare("INSERT INTO user_profiles (user_id) VALUES (?)");
-            $stmt->execute([$user_id]);
-            
-            // Set session variables
-            $_SESSION['user_id'] = $user_id;
-            $_SESSION['user_name'] = $name;
-            $_SESSION['user_email'] = $email;
+            if (!$user) {
+                // Create new user
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, social_id, social_provider, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $stmt->execute([$name, $email, $socialId, $provider]);
+                
+                $userId = $pdo->lastInsertId();
+                
+                // Create user profile
+                $profileStmt = $pdo->prepare("INSERT INTO user_profiles (user_id) VALUES (?)");
+                $profileStmt->execute([$userId]);
+                
+                // Get the new user
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $user = $stmt->fetch();
+            } else {
+                // Update existing user with social info
+                $stmt = $pdo->prepare("UPDATE users SET social_id = ?, social_provider = ? WHERE id = ?");
+                $stmt->execute([$socialId, $provider, $user['id']]);
+            }
         }
         
-        // Redirect to dashboard
-        header("Location: ../dashboard.php");
+        // Login the user
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['is_admin'] = $user['is_admin'];
+        
+        // Update last login time
+        $updateStmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+        $updateStmt->execute([$user['id']]);
+        
+        header('Location: ../dashboard.php');
         exit;
+        
     } catch (PDOException $e) {
-        $_SESSION['error'] = "Social login failed: " . $e->getMessage();
-        header("Location: ../index.php");
-        exit;
+        $error = 'Database error: ' . $e->getMessage();
     }
-} else {
-    // No provider specified
-    $_SESSION['error'] = "Invalid social login provider";
-    header("Location: ../index.php");
-    exit;
 }
+
+// Include header
+include_once '../includes/header.php';
+?>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-6">
+            <h2 class="text-2xl font-bold text-center mb-6 text-amber-700">Social Login</h2>
+            
+            <?php if (!empty($error)): ?>
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    <?php echo $error; ?>
+                </div>
+                <p class="text-center mt-4">
+                    <a href="login.php" class="text-amber-600 hover:text-amber-800 font-medium">
+                        Back to login
+                    </a>
+                </p>
+            <?php else: ?>
+                <div class="text-center">
+                    <p class="mb-4">Connecting to <?php echo ucfirst($provider); ?>...</p>
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto"></div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<?php include_once '../includes/footer.php'; ?>

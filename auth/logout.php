@@ -1,28 +1,31 @@
 <?php
 session_start();
-require_once '../config/database.php';
 
-// Clear remember token if exists
+// Clear all session variables
+$_SESSION = [];
+
+// Delete the session cookie
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    setcookie(
+        session_name(),
+        '',
+        time() - 42000,
+        $params["path"],
+        $params["domain"],
+        $params["secure"],
+        $params["httponly"]
+    );
+}
+
+// Delete remember me cookie if it exists
 if (isset($_COOKIE['remember_token'])) {
-    $token = $_COOKIE['remember_token'];
-    
-    // Delete token from database
-    try {
-        $stmt = $pdo->prepare("DELETE FROM remember_tokens WHERE token = ?");
-        $stmt->execute([$token]);
-    } catch (PDOException $e) {
-        // Log error but continue with logout
-        error_log("Error deleting remember token: " . $e->getMessage());
-    }
-    
-    // Delete cookie
     setcookie('remember_token', '', time() - 3600, '/', '', false, true);
 }
 
-// Destroy session
-session_unset();
+// Destroy the session
 session_destroy();
 
 // Redirect to login page
-header("Location: ../index.php");
+header('Location: login.php');
 exit;
