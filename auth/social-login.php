@@ -1,98 +1,73 @@
 <?php
-require_once '../config/database.php';
+// Start session
 session_start();
 
-// This is a simplified mock implementation of social login
-// In a real application, you would use OAuth libraries for each provider
+// Include database configuration
+require_once '../config/database.php';
 
+// Get provider from URL parameter
 $provider = isset($_GET['provider']) ? $_GET['provider'] : '';
-$error = '';
+$action = isset($_GET['action']) ? $_GET['action'] : 'login';
 
-if (empty($provider)) {
-    $error = 'No provider specified';
-} else {
-    // Mock social login data
-    $socialId = 'social_' . uniqid();
-    $name = 'Social User';
-    $email = 'social_' . uniqid() . '@example.com';
-    
-    try {
-        // Check if user exists with this social ID
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE social_id = ? AND social_provider = ?");
-        $stmt->execute([$socialId, $provider]);
-        $user = $stmt->fetch();
-        
-        if (!$user) {
-            // Check if email exists
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
-            
-            if (!$user) {
-                // Create new user
-                $stmt = $pdo->prepare("INSERT INTO users (name, email, social_id, social_provider, created_at) VALUES (?, ?, ?, ?, NOW())");
-                $stmt->execute([$name, $email, $socialId, $provider]);
-                
-                $userId = $pdo->lastInsertId();
-                
-                // Create user profile
-                $profileStmt = $pdo->prepare("INSERT INTO user_profiles (user_id) VALUES (?)");
-                $profileStmt->execute([$userId]);
-                
-                // Get the new user
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-                $stmt->execute([$userId]);
-                $user = $stmt->fetch();
-            } else {
-                // Update existing user with social info
-                $stmt = $pdo->prepare("UPDATE users SET social_id = ?, social_provider = ? WHERE id = ?");
-                $stmt->execute([$socialId, $provider, $user['id']]);
-            }
-        }
-        
-        // Login the user
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user_name'] = $user['name'];
-        $_SESSION['is_admin'] = $user['is_admin'];
-        
-        // Update last login time
-        $updateStmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-        $updateStmt->execute([$user['id']]);
-        
-        header('Location: ../dashboard.php');
-        exit;
-        
-    } catch (PDOException $e) {
-        $error = 'Database error: ' . $e->getMessage();
-    }
+// Validate provider
+if (!in_array($provider, ['google', 'facebook', 'github'])) {
+    $_SESSION['error'] = "Invalid authentication provider";
+    header("Location: ../index.php");
+    exit;
 }
 
-// Include header
-include_once '../includes/header.php';
+// In a real application, you would implement OAuth flow with the selected provider
+// For demonstration purposes, we'll simulate a successful social login
+
+// Generate a random user ID and email based on provider
+$social_id = uniqid($provider . '_');
+$name = ucfirst($provider) . ' User';
+$email = $social_id . '@example.com';
+
+try {
+    // Connect to database
+    $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password_db);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    // Check if user with this social ID exists
+    $stmt = $conn->prepare("SELECT * FROM users WHERE social_id = :social_id AND social_provider = :provider LIMIT 1");
+    $stmt->bindParam(':social_id', $social_id);
+    $stmt->bindParam(':provider', $provider);
+    $stmt->execute();
+    
+    if ($stmt->rowCount() > 0) {
+        // User exists, log them in
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_email'] = $user['email'];
+        $_SESSION['user_role'] = $user['role'];
+    } else {
+        // User doesn't exist, create new account
+        $stmt = $conn->prepare("INSERT INTO users (name, email, social_id, social_provider, role, created_at) 
+                               VALUES (:name, :email, :social_id, :provider, 'user', NOW())");
+        $stmt->bindParam(':name', $name);
+        $stmt->bindParam(':email', $email);
+        $stmt->bindParam(':social_id', $social_id);
+        $stmt->bindParam(':provider', $provider);
+        $stmt->execute();
+        
+        $user_id = $conn->lastInsertId();
+        
+        $_SESSION['user_id'] = $user_id;
+        $_SESSION['user_name'] = $name;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_role'] = 'user';
+    }
+    
+    // Redirect to dashboard
+    header("Location: ../dashboard.php");
+    exit;
+    
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+    header("Location: ../index.php");
+    exit;
+}
 ?>
-
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-        <div class="p-6">
-            <h2 class="text-2xl font-bold text-center mb-6 text-amber-700">Social Login</h2>
-            
-            <?php if (!empty($error)): ?>
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    <?php echo $error; ?>
-                </div>
-                <p class="text-center mt-4">
-                    <a href="login.php" class="text-amber-600 hover:text-amber-800 font-medium">
-                        Back to login
-                    </a>
-                </p>
-            <?php else: ?>
-                <div class="text-center">
-                    <p class="mb-4">Connecting to <?php echo ucfirst($provider); ?>...</p>
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto"></div>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-
-<?php include_once '../includes/footer.php'; ?>

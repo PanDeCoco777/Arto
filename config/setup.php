@@ -1,55 +1,49 @@
 <?php
-// Configuration setup file
-
-// Define application constants
-define('APP_NAME', 'ArtiSell');
-define('APP_DESCRIPTION', 'Cebu Artisan Marketplace');
-define('APP_VERSION', '1.0.0');
-
-// Set default timezone
-date_default_timezone_set('Asia/Manila');
-
-// Error reporting settings
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// Session configuration
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 0); // Set to 1 in production with HTTPS
-
 // Include database configuration
-require_once __DIR__ . '/database.php';
+require_once 'database.php';
 
-// Helper functions
-function redirect($url) {
-    header("Location: $url");
-    exit;
+// Function to create the database if it doesn't exist
+function createDatabase() {
+    global $host, $dbname, $username, $password_db;
+    
+    try {
+        $conn = new PDO("mysql:host=$host", $username, $password_db);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        // Create database if it doesn't exist
+        $conn->exec("CREATE DATABASE IF NOT EXISTS $dbname CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        return true;
+    } catch(PDOException $e) {
+        return false;
+    }
 }
 
-function sanitize_output($data) {
-    return htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+// Function to check if setup is complete
+function isSetupComplete() {
+    if (!checkDatabaseConnection()) {
+        return false;
+    }
+    
+    global $host, $dbname, $username, $password_db;
+    
+    try {
+        $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password_db);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        // Check if users table exists and has at least one admin user
+        $stmt = $conn->prepare("SHOW TABLES LIKE 'users'");
+        $stmt->execute();
+        
+        if ($stmt->rowCount() > 0) {
+            $stmt = $conn->prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1");
+            $stmt->execute();
+            
+            return $stmt->rowCount() > 0;
+        }
+        
+        return false;
+    } catch(PDOException $e) {
+        return false;
+    }
 }
-
-function is_logged_in() {
-    return isset($_SESSION['user_id']);
-}
-
-function is_admin() {
-    return isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === 1;
-}
-
-function format_price($price) {
-    return '₱' . number_format($price, 2);
-}
-
-function get_current_url() {
-    return (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-}
-
-function get_base_url() {
-    $base_dir = str_replace(basename($_SERVER['SCRIPT_NAME']), '', $_SERVER['SCRIPT_NAME']);
-    $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$base_dir";
-    return $base_url;
-}
+?>

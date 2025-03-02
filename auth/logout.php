@@ -1,31 +1,35 @@
 <?php
+// Start session
 session_start();
 
-// Clear all session variables
-$_SESSION = [];
+// Include database configuration
+require_once '../config/database.php';
 
-// Delete the session cookie
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(
-        session_name(),
-        '',
-        time() - 42000,
-        $params["path"],
-        $params["domain"],
-        $params["secure"],
-        $params["httponly"]
-    );
-}
-
-// Delete remember me cookie if it exists
+// Clear remember me cookie if it exists
 if (isset($_COOKIE['remember_token'])) {
-    setcookie('remember_token', '', time() - 3600, '/', '', false, true);
+    // Connect to database to clear token
+    try {
+        $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password_db);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        // Clear token in database
+        $stmt = $conn->prepare("UPDATE users SET remember_token = NULL, token_expires = NULL WHERE id = :id");
+        $stmt->bindParam(':id', $_SESSION['user_id']);
+        $stmt->execute();
+        
+        // Delete cookie
+        setcookie('remember_token', '', time() - 3600, '/', '', false, true);
+    } catch(PDOException $e) {
+        // Just log the error, don't stop the logout process
+        error_log("Database error during logout: " . $e->getMessage());
+    }
 }
 
-// Destroy the session
+// Destroy session
+session_unset();
 session_destroy();
 
 // Redirect to login page
-header('Location: login.php');
+header("Location: ../index.php");
 exit;
+?>
